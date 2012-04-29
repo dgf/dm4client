@@ -4,7 +4,7 @@ A [DeepaMehta 4](http://github.com/jri/deepamehta) REST client library
 
 ## Requirements
 
-  * DeepaMehta 4 with actived [dm4-webservice]
+  * DeepaMehta 4 with active [dm4-webservice]
     (http://github.com/jri/deepamehta/tree/master/modules/dm4-webservice)
     module
   * Node.js and npm
