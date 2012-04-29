@@ -1,0 +1,41 @@
+{
+    "name": "dm4client"
+  , "version": "0.0.1"
+  , "author": "Danny Gräf <github@dagnu.de>"
+
+  , "keywords": ["DeepaMehta", "REST", "client"]
+  , "description": "DeepaMehta 4 client"
+  , "main": "lib/dm4client.js"
+
+  , "licenses": [{
+      "type": "MIT"
+    , "url": "http://github.com/dgf/dm4client/raw/master/LICENSE"
+  }]
+  , "repository": {
+      "type": "git"
+    , "url": "git://github.com/dgf/dm4client.git"
+  }
+
+  , "dependencies": {
+      "coffee-script": "1.2.x"
+    , "async": "0.1.x"
+    , "restler": "2.0.x"
+    , "underscore": "1.3.x"
+  }
+  , "devDependencies": {
+      "jasmine-node": "1.0.x"
+    , "mime-magic": "0.2.x"
+    , "temp": "0.4.x"
+  }
+
+  , "engines": {
+      "node": "~0.6.7"
+  }
+
+  , "scripts": {
+      "pretest": "cake build"
+    , "prepublish": "cake build"
+    , "test": "cake spec"
+  }
+
+}
