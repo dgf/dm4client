@@ -5,22 +5,34 @@ http = require 'http'
 url = require 'url'
 util = require 'util'
 
-GET = (url, onSuccess) ->
-  rest.get(url).on 'success', onSuccess
+createOnComplete = (onSuccess, onError, errorMessage) ->
+  (result, response) ->
+    if result instanceof Error
+      onError 500, result
+    else if response.statusCode is 200
+      onSuccess result
+    else
+      onError response.statusCode, new Error errorMessage
 
-DEL = (url, onSuccess) ->
-  rest.del(url).on 'success', onSuccess
+GET = (getUrl, onSuccess, onError = (status, error) -> throw error) ->
+  onComplete = createOnComplete onSuccess, onError, "requesting #{getUrl} failed"
+  rest.get(getUrl).on 'complete', onComplete
 
-POST = (url, data, onSuccess) ->
-  rest.postJson(url, data).on 'success', onSuccess
+DEL = (delUrl, onSuccess, onError = (status, error) -> throw error) ->
+  onComplete = createOnComplete onSuccess, onError, "deleting #{delUrl} failed"
+  rest.del(delUrl).on 'complete', onComplete
 
-PUT = (url, data, onSuccess) ->
-  r = rest.put url,
+POST = (postUrl, data, onSuccess, onError = (status, error) -> throw error) ->
+  onComplete = createOnComplete onSuccess, onError, "posting to #{postUrl} failed"
+  rest.postJson(postUrl, data).on 'complete', onComplete
+
+PUT = (putUrl, data, onSuccess, onError = (status, error) -> throw error) ->
+  options =
     data: JSON.stringify data
     headers:
-      'Content-Type':
-        'application/json'
-  r.on 'success', onSuccess
+      'Content-Type': 'application/json'
+  onComplete = createOnComplete onSuccess, onError, "put to #{putUrl} failed"
+  rest.put(putUrl, options).on 'complete', onComplete
 
 dataTypeUri = 'dm4.core.data_type'
 iconUri = 'dm4.webclient.icon'
@@ -63,7 +75,7 @@ detachType = (type) ->
   uri: type.uri
   dataType: type.data_type_uri
   childTypes: createChildTypes type.assoc_defs
-  icon: type.icon ? defaultIcon
+  icon: type.icon? defaultIcon
 
 clarifyParents = (types) ->
   parentsByChild = {}
@@ -82,7 +94,7 @@ exports.create = (serverUrl = 'http://localhost:8080/') ->
   topicCreateUrl = serverUrl + topicEndpoint
 
   topicUrl = (id) ->
-    serverUrl + topicInfo + id + fetchComposite
+    serverUrl + topicInfo + id
 
   topicsUrl = (uri) ->
     serverUrl + topicsByType + uri + fetchComposite
@@ -104,40 +116,39 @@ exports.create = (serverUrl = 'http://localhost:8080/') ->
       else
         onSuccess typeInfos
 
-  createTopic: (topic, onSuccess) ->
-    POST topicCreateUrl, topic, onSuccess
+  createTopic: (topic, onSuccess, onError) ->
+    POST topicCreateUrl, topic, onSuccess, onError
 
-  deleteTopic: (id, onSuccess) ->
-    DEL topicUrl(id), onSuccess
+  deleteTopic: (id, onSuccess, onError) ->
+    DEL topicUrl(id), onSuccess, onError
 
-  getDataTypes: (onSuccess) ->
-    GET topicsUrl(dataTypeUri), (data) ->
-      onSuccess (detachDataType t for t in data.items)
+  getDataTypes: (onSuccess, onError) ->
+    detach = (data) -> onSuccess (detachDataType t for t in data.items)
+    GET topicsUrl(dataTypeUri), detach, onError
 
-  getResource: (path, onSuccess, onError) ->
+  getResource: (path, onSuccess, onError = (status, error) -> throw error) ->
     options = _.extend httpOptions, path: path
     handle = (response) ->
       if response.statusCode is 200
         onSuccess response
       else
-        onError url.format(options) + ' request failed: ' + response.statusCode
-    http.get(options, handle).on 'error', (error) -> onError error.message
+        rUrl = url.format(options)
+        onError response.statusCode, new Error "requesting #{rUrl} failed"
+    http.get(options, handle).on 'error', (error) -> onError 500, error
 
-  getTopic: (id, onSuccess) ->
-    GET topicUrl(id), (data) -> onSuccess detachTopic data
+  getTopic: (id, onSuccess, onError) ->
+    detach = (data) -> onSuccess detachTopic data
+    GET topicUrl(id) + fetchComposite, detach, onError
 
-  getTopics: (uri, onSuccess) ->
-    GET topicsUrl(uri), (data) ->
-      onSuccess (detachTopic t for t in data.items)
+  getTopics: (uri, onSuccess, onError) ->
+    detach = (data) -> onSuccess (detachTopic t for t in data.items)
+    GET topicsUrl(uri), detach, onError
 
-  getTypes: (onSuccess) ->
-    GET typesUrl, (data) ->
+  getTypes: (onSuccess, onError) ->
+    detach = (data) ->
       getTypeInfos data, (typeInfos) ->
         onSuccess clarifyParents (detachType t for t in typeInfos)
+    GET typesUrl, detach, onError
 
-  updateTopic: (topic, onSuccess) ->
-    t =
-      id: topic.id
-      type_uri: topic.type_uri
-      value: topic.value
-    PUT topicCreateUrl, t, onSuccess
+  updateTopic: (topic, onSuccess, onError) ->
+    PUT topicCreateUrl, topic, onSuccess, onError
