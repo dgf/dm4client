@@ -38,6 +38,9 @@ dataTypeUri = 'dm4.core.data_type'
 iconUri = 'dm4.webclient.icon'
 assocDefChildTypes = ['dm4.core.aggregation_def', 'dm4.core.composition_def']
 
+associationEndpoint = 'core/association'
+associationInfo = associationEndpoint + '/'
+
 topicEndpoint = 'core/topic'
 topicInfo = topicEndpoint + '/'
 topicsByType = topicEndpoint + '/by_type/'
@@ -91,6 +94,11 @@ exports.create = (serverUrl = 'http://localhost:8080/') ->
 #
   httpOptions = url.parse serverUrl
 
+  associationCreateUrl = serverUrl + associationEndpoint
+
+  associationUrl = (id) ->
+    serverUrl + associationInfo + id
+
   topicCreateUrl = serverUrl + topicEndpoint
 
   topicUrl = (id) ->
@@ -104,20 +112,27 @@ exports.create = (serverUrl = 'http://localhost:8080/') ->
   typeUrl = (uri) ->
     serverUrl + typeInfo + uri
 
-  getTypeInfos = (types, onSuccess) ->
+  getTypeInfos = (types, onSuccess, onError = (error) -> throw error) ->
     typeInfos = []
     getTypeInfo = (uri, callback) ->
-      rest.get(typeUrl uri).on 'success', (type, status) ->
+      addTypeInfo = (type) ->
         typeInfos.push type
         callback()
+      GET typeUrl(uri), addTypeInfo, onError
     async.forEachLimit types, 10, getTypeInfo, (err) ->
       if err?
-        throw new Error err
+        onError new Error err
       else
         onSuccess typeInfos
 
+  createAssociation: (association, onSuccess, onError) ->
+    POST associationCreateUrl, association, onSuccess, onError
+
   createTopic: (topic, onSuccess, onError) ->
     POST topicCreateUrl, topic, onSuccess, onError
+
+  deleteAssociation: (id, onSuccess, onError) ->
+    DEL associationUrl(id), onSuccess, onError
 
   deleteTopic: (id, onSuccess, onError) ->
     DEL topicUrl(id), onSuccess, onError
@@ -145,10 +160,11 @@ exports.create = (serverUrl = 'http://localhost:8080/') ->
     GET topicsUrl(uri), detach, onError
 
   getTypes: (onSuccess, onError) ->
-    detach = (data) ->
-      getTypeInfos data, (typeInfos) ->
+    getAndDetachInfos = (data) ->
+      detach = (typeInfos) ->
         onSuccess clarifyParents (detachType t for t in typeInfos)
-    GET typesUrl, detach, onError
+      getTypeInfos data, detach, onError
+    GET typesUrl, getAndDetachInfos, onError
 
   updateTopic: (topic, onSuccess, onError) ->
     PUT topicCreateUrl, topic, onSuccess, onError

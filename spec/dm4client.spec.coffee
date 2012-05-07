@@ -158,7 +158,7 @@ describe 'dm4client', ->
           done()
 
 # stateful integration test
-describe 'person crudle', ->
+describe 'person crudle and web resource association', ->
 #
   person =
     type_uri: personTypeUri
@@ -172,6 +172,12 @@ describe 'person crudle', ->
       ],
       'dm4.contacts.email_address': [ 'dev@deeepamehta.de' ],
       'dm4.webbrowser.url': [ 'http://www.deeepamehta.de' ]
+
+  webResource =
+    type_uri: 'dm4.webbrowser.web_resource'
+    composite:
+      'dm4.webbrowser.url': 'http://trac.deeepamehta.de'
+      'dm4.webbrowser.web_resource_description': 'DeepaMehta Trac'
 
   it 'creates person', ->
     aCheck 'create person', (done) ->
@@ -211,6 +217,51 @@ describe 'person crudle', ->
         expect(actual).toContain lastName.value, 'contains lastname'
         done()
       dm4c.getTopics personTypeUri, assert
+
+  it 'creates a web resource topic', ->
+    aCheck 'create a web resource', (done) ->
+      dm4c.createTopic webResource, (topic) ->
+        expect(topic.id).toBeDefined 'web resource id'
+        console.log topic
+        webResource = topic
+        done()
+
+  associationId = null
+
+  it 'associates a person with a web resource', ->
+    aCheck 'create an association', (done) ->
+      a =
+        type_uri: 'dm4.core.association'
+        role_1:
+          role_type_uri: 'dm4.core.default'
+          topic_id: person.id
+        role_2:
+          role_type_uri: 'dm4.core.default'
+          topic_id: webResource.id
+      dm4c.createAssociation a, (assoc) ->
+        expect(assoc.id).toBeDefined 'association id'
+        associationId = assoc.id
+        expect(assoc.role_1.topic_id).toBe person.id, 'person node'
+        expect(assoc.role_2.topic_id).toBe webResource.id, 'web resource node'
+        done()
+
+  it 'deletes an association', ->
+    aCheck 'delete an association', (done) ->
+      dm4c.deleteAssociation associationId, (list) ->
+        expect(list.length > 0).toBeTruthy 'deleted associations'
+        topic = list[list.length - 1]
+        expect(topic.type).toBe 'DELETE_ASSOCIATION', 'last association'
+        expect(topic.arg.id).toBe associationId, 'association id'
+        done()
+
+  it 'deletes a web resource', ->
+    aCheck 'delete web resource', (done) ->
+      dm4c.deleteTopic webResource.id, (list) ->
+        expect(list.length > 0).toBeTruthy 'deleted associations and topics'
+        topic = list[list.length - 1]
+        expect(topic.type).toBe 'DELETE_TOPIC', 'last topic'
+        expect(topic.arg.id).toBe webResource.id, 'person id'
+        done()
 
   it 'deletes a person', ->
     aCheck 'delete person', (done) ->
