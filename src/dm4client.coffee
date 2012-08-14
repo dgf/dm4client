@@ -51,7 +51,9 @@ typeInfo = typesEndpoint + '/'
 
 defaultIcon = '/images/ball-gray.png'
 
-detachDataType = (t) -> name: t.value, uri: t.uri
+detachDataType = (t) ->
+  name: t.value
+  uri: t.uri
 
 isChildType = (assoc_def) ->
   true if assoc_def.assoc_type_uri in assocDefChildTypes
@@ -62,6 +64,12 @@ createChildTypes = (assoc_defs) ->
 
 detachComposite = (composite) ->
   detachTopic part for typeUri, part of composite
+
+detachAsscociation = (association) ->
+  _.extend detachTopic(association), roles: [
+    { id: association.role_1.topic_id, type: association.role_1.topic_id }
+    { id: association.role_2.topic_id, type: association.role_2.topic_id }
+  ]
 
 detachTopic = (topic) ->
   id: topic.id
@@ -137,6 +145,10 @@ exports.create = (serverUrl = 'http://localhost:8080/') ->
   deleteTopic: (id, onSuccess, onError) ->
     DEL topicUrl(id), onSuccess, onError
 
+  getAssociation: (id, onSuccess, onError) ->
+    detach = (data) -> onSuccess detachAsscociation data
+    GET associationUrl(id) + fetchComposite, detach, onError
+
   getDataTypes: (onSuccess, onError) ->
     detach = (data) -> onSuccess (detachDataType t for t in data.items)
     GET topicsUrl(dataTypeUri), detach, onError
@@ -166,5 +178,11 @@ exports.create = (serverUrl = 'http://localhost:8080/') ->
       getTypeInfos data, detach, onError
     GET typesUrl, getAndDetachInfos, onError
 
+
+  # update an association, callback gets the resulting directives
+  updateAssociation: (association, onSuccess, onError) ->
+    PUT associationCreateUrl, association, onSuccess, onError
+
+  # update a topic, callback gets the resulting directives
   updateTopic: (topic, onSuccess, onError) ->
     PUT topicCreateUrl, topic, onSuccess, onError

@@ -7,7 +7,7 @@ dm4client = require('../src/dm4client')
 
 compositeDataTypeUri = 'dm4.core.composite'
 personTypeUri = 'dm4.contacts.person'
-defaultIcon = '/images/ball-gray.png'
+defaultIcon = '/de.deepamehta.webclient/images/ball-gray.png'
 
 dm4c = dm4client.create()
 
@@ -222,13 +222,13 @@ describe 'person crudle and web resource association', ->
     aCheck 'create a web resource', (done) ->
       dm4c.createTopic webResource, (topic) ->
         expect(topic.id).toBeDefined 'web resource id'
-        console.log topic
         webResource = topic
         done()
 
   associationId = null
 
   it 'associates a person with a web resource', ->
+    # @todo create a association composite
     aCheck 'create an association', (done) ->
       a =
         type_uri: 'dm4.core.association'
@@ -243,6 +243,30 @@ describe 'person crudle and web resource association', ->
         associationId = assoc.id
         expect(assoc.role_1.topic_id).toBe person.id, 'person node'
         expect(assoc.role_2.topic_id).toBe webResource.id, 'web resource node'
+        done()
+
+  it 'returns an association', ->
+    aCheck 'get assocication', (done) ->
+      dm4c.getAssociation associationId, (assoc) ->
+        expect(assoc.id).toBe(associationId, 'association id')
+        expect(assoc.roles[0].id).toBe person.id, 'person node'
+        done()
+
+  it 'changes an association partially', ->
+    # @todo the call should'nt depend on role IDs
+    aCheck 'update association role type URIs', (done) ->
+      association =
+        id: associationId
+        role_1:
+          topic_id: person.id
+          role_type_uri: 'dm4.core.whole'
+        role_2:
+          topic_id: webResource.id
+          role_type_uri: 'dm4.core.part'
+      dm4c.updateAssociation association, (list) ->
+        expect(list.length).toBe 1, 'updated association'
+        expect(list[0].type).toBe 'UPDATE_ASSOCIATION', 'update association'
+        expect(list[0].arg.id).toBe associationId, 'association id'
         done()
 
   it 'deletes an association', ->
