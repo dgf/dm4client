@@ -8,31 +8,28 @@ util = require 'util'
 createOnComplete = (onSuccess, onError, errorMessage) ->
   (result, response) ->
     if result instanceof Error
-      onError 500, result
+      onError 510, result
     else if response.statusCode is 200
       onSuccess result
     else
       onError response.statusCode, new Error errorMessage
 
-GET = (getUrl, onSuccess, onError = (status, error) -> throw error) ->
+GET = (getUrl, options, onSuccess, onError = (status, error) -> throw error) ->
   onComplete = createOnComplete onSuccess, onError, "requesting #{getUrl} failed"
-  rest.get(getUrl).on 'complete', onComplete
+  rest.get(getUrl, _.clone options).on 'complete', onComplete
 
-DEL = (delUrl, onSuccess, onError = (status, error) -> throw error) ->
+DEL = (delUrl, options, onSuccess, onError = (status, error) -> throw error) ->
   onComplete = createOnComplete onSuccess, onError, "deleting #{delUrl} failed"
-  rest.del(delUrl).on 'complete', onComplete
+  rest.del(delUrl, _.clone options).on 'complete', onComplete
 
-POST = (postUrl, data, onSuccess, onError = (status, error) -> throw error) ->
+POST = (postUrl, data, options, onSuccess, onError = (status, error) -> throw error) ->
   onComplete = createOnComplete onSuccess, onError, "posting to #{postUrl} failed"
-  rest.postJson(postUrl, data).on 'complete', onComplete
+  rest.postJson(postUrl, data, _.clone options).on 'complete', onComplete
 
-PUT = (putUrl, data, onSuccess, onError = (status, error) -> throw error) ->
-  options =
-    data: JSON.stringify data
-    headers:
-      'Content-Type': 'application/json'
+PUT = (putUrl, data, options, onSuccess, onError = (status, error) -> throw error) ->
+  putOptions = _.extend data: JSON.stringify(data), options
   onComplete = createOnComplete onSuccess, onError, "put to #{putUrl} failed"
-  rest.put(putUrl, options).on 'complete', onComplete
+  rest.put(putUrl, putOptions).on 'complete', onComplete
 
 dataTypeUri = 'dm4.core.data_type'
 iconUri = 'dm4.webclient.icon'
@@ -49,7 +46,7 @@ fetchComposite = '?fetch_composite=true'
 typesEndpoint = 'core/topictype'
 typeInfo = typesEndpoint + '/'
 
-defaultIcon = '/images/ball-gray.png'
+defaultIcon = 'de.deepamehta.webclient/images/ball-gray.png'
 
 detachDataType = (t) ->
   name: t.value
@@ -98,9 +95,14 @@ clarifyParents = (types) ->
     type.parentTypes = parentsByChild[type.uri]
   types
 
+# creates a DM4 client
 exports.create = (serverUrl = 'http://localhost:8080/') ->
-#
+
   httpOptions = url.parse serverUrl
+
+  restOptions = {}
+    #headers:
+      #'Content-Type': 'application/json'
 
   associationCreateUrl = serverUrl + associationEndpoint
 
@@ -126,7 +128,7 @@ exports.create = (serverUrl = 'http://localhost:8080/') ->
       addTypeInfo = (type) ->
         typeInfos.push type
         callback()
-      GET typeUrl(uri), addTypeInfo, onError
+      GET typeUrl(uri), restOptions, addTypeInfo, onError
     async.forEachLimit types, 10, getTypeInfo, (err) ->
       if err?
         onError new Error err
@@ -134,24 +136,24 @@ exports.create = (serverUrl = 'http://localhost:8080/') ->
         onSuccess typeInfos
 
   createAssociation: (association, onSuccess, onError) ->
-    POST associationCreateUrl, association, onSuccess, onError
+    POST associationCreateUrl, association, restOptions, onSuccess, onError
 
   createTopic: (topic, onSuccess, onError) ->
-    POST topicCreateUrl, topic, onSuccess, onError
+    POST topicCreateUrl, topic, restOptions, onSuccess, onError
 
   deleteAssociation: (id, onSuccess, onError) ->
-    DEL associationUrl(id), onSuccess, onError
+    DEL associationUrl(id), restOptions, onSuccess, onError
 
   deleteTopic: (id, onSuccess, onError) ->
-    DEL topicUrl(id), onSuccess, onError
+    DEL topicUrl(id), restOptions, onSuccess, onError
 
   getAssociation: (id, onSuccess, onError) ->
     detach = (data) -> onSuccess detachAsscociation data
-    GET associationUrl(id) + fetchComposite, detach, onError
+    GET associationUrl(id) + fetchComposite, restOptions, detach, onError
 
   getDataTypes: (onSuccess, onError) ->
     detach = (data) -> onSuccess (detachDataType t for t in data.items)
-    GET topicsUrl(dataTypeUri), detach, onError
+    GET topicsUrl(dataTypeUri), restOptions, detach, onError
 
   getResource: (path, onSuccess, onError = (status, error) -> throw error) ->
     options = _.extend httpOptions, path: path
@@ -164,25 +166,49 @@ exports.create = (serverUrl = 'http://localhost:8080/') ->
     http.get(options, handle).on 'error', (error) -> onError 500, error
 
   getTopic: (id, onSuccess, onError) ->
-    detach = (data) -> onSuccess detachTopic data
-    GET topicUrl(id) + fetchComposite, detach, onError
+    detach = (data) ->
+      onSuccess detachTopic data
+    GET topicUrl(id) + fetchComposite, restOptions, detach, onError
 
   getTopics: (uri, onSuccess, onError) ->
     detach = (data) -> onSuccess (detachTopic t for t in data.items)
-    GET topicsUrl(uri), detach, onError
+    GET topicsUrl(uri), restOptions, detach, onError
 
   getTypes: (onSuccess, onError) ->
     getAndDetachInfos = (data) ->
       detach = (typeInfos) ->
         onSuccess clarifyParents (detachType t for t in typeInfos)
       getTypeInfos data, detach, onError
-    GET typesUrl, getAndDetachInfos, onError
+    GET typesUrl, restOptions, getAndDetachInfos, onError
 
+  login: (user, password, onSuccess, onError = (status, error) -> throw error) ->
+    loginOptions =
+      auth: user + ':' + password
+      method: 'POST'
+    _.extend loginOptions, httpOptions, path: '/accesscontrol/login'
+    loginRequest = http.request loginOptions, (response) ->
+      if response.statusCode isnt 204
+        onError response.statusCode, new Error "login #{user} failed"
+      else
+        # get session ID and set header cookie of http and rest client
+        sessionId = response.headers['set-cookie'][0].replace /;Path.*/, ''
+        _.extend httpOptions, headers: Cookie: sessionId
+        _.extend restOptions, headers: Cookie: sessionId
+        onSuccess sessionId
+    loginRequest.on 'error', (e) -> onError 500, e.message
+    loginRequest.end()
+
+  openSpace: (uri, onSuccess, onError) ->
+    updateCookie = (data) ->
+      httpOptions.headers.Cookie += '; dm4_workspace_id=' + data.id
+      restOptions.headers.Cookie += '; dm4_workspace_id=' + data.id
+      onSuccess data.id
+    GET topicUrl('by_value/uri/' + uri), restOptions, updateCookie, onError
 
   # update an association, callback gets the resulting directives
   updateAssociation: (association, onSuccess, onError) ->
-    PUT associationCreateUrl, association, onSuccess, onError
+    PUT associationCreateUrl, association, restOptions, onSuccess, onError
 
   # update a topic, callback gets the resulting directives
   updateTopic: (topic, onSuccess, onError) ->
-    PUT topicCreateUrl, topic, onSuccess, onError
+    PUT topicCreateUrl, topic, restOptions, onSuccess, onError

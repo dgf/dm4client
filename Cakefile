@@ -27,3 +27,4 @@ logSuccess = (status) ->
 task 'build', 'build coffee', -> build logSuccess
 
 task 'spec', 'run specifications', -> spec logSuccess
+
