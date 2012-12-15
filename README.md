@@ -1,3 +1,4 @@
+[![build status](https://secure.travis-ci.org/dgf/dm4client.png)](http://travis-ci.org/dgf/dm4client)
 # DeepaMehta 4 client
 
 A [DeepaMehta 4](http://github.com/jri/deepamehta) REST client library
