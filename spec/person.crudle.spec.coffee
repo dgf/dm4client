@@ -118,10 +118,10 @@ describe 'person crudle and web resource association', ->
         id: associationId
         role_1:
           topic_id: person.id
-          role_type_uri: 'dm4.core.whole'
+          role_type_uri: 'dm4.core.parent'
         role_2:
           topic_id: webResource.id
-          role_type_uri: 'dm4.core.part'
+          role_type_uri: 'dm4.core.child'
       dm4c.updateAssociation association, (list) ->
         expect(list.length).toBe 1, 'updated association'
         expect(list[0].type).toBe 'UPDATE_ASSOCIATION', 'update association'

@@ -1,6 +1,6 @@
 {
     "name": "dm4client"
-  , "version": "0.1.0"
+  , "version": "0.2.0"
   , "author": "Danny Gräf <github@dagnu.de>"
 
   , "keywords": ["DeepaMehta", "REST", "client"]

@@ -32,6 +32,7 @@ PUT = (putUrl, data, options, onSuccess, onError = (status, error) -> throw erro
   rest.put(putUrl, putOptions).on 'complete', onComplete
 
 dataTypeUri = 'dm4.core.data_type'
+childTypeUri = 'dm4.core.child_type'
 iconUri = 'dm4.webclient.icon'
 assocDefChildTypes = ['dm4.core.aggregation_def', 'dm4.core.composition_def']
 
@@ -46,18 +47,19 @@ fetchComposite = '?fetch_composite=true'
 typesEndpoint = 'core/topictype'
 typeInfo = typesEndpoint + '/'
 
-defaultIcon = 'de.deepamehta.webclient/images/ball-gray.png'
+defaultIcon = '/de.deepamehta.webclient/images/ball-gray.png'
 
 detachDataType = (t) ->
   name: t.value
   uri: t.uri
 
-isChildType = (assoc_def) ->
-  true if assoc_def.assoc_type_uri in assocDefChildTypes
-
 createChildTypes = (assoc_defs) ->
   for assoc_def in assoc_defs
-    assoc_def.uri if isChildType assoc_def
+    if assoc_def.type_uri in assocDefChildTypes
+      if assoc_def.role_1.role_type_uri is childTypeUri
+        assoc_def.role_1.topic_uri
+      else
+        assoc_def.role_2.topic_uri
 
 detachComposite = (composite) ->
   detachTopic part for typeUri, part of composite
@@ -83,7 +85,7 @@ detachType = (type) ->
   uri: type.uri
   dataType: type.data_type_uri
   childTypes: createChildTypes type.assoc_defs
-  icon: type.icon? defaultIcon
+  icon: type.icon ? defaultIcon
 
 clarifyParents = (types) ->
   parentsByChild = {}
